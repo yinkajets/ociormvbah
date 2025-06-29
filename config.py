@@ -1,6 +1,7 @@
 #####################################
 ## config.py (to define constants) ##
 #####################################
+R = 3
 n = 4            # Total nodes
 t = 1            # Maximum Byzantine nodes
 IDs = [0, 1, 2, 3]

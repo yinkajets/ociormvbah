@@ -1,5 +1,5 @@
 #############################################################################################
-### election.py : function collects input from multiple nodes and generates random index. ###
+### election.py : handles and generates random index for election ###
 #############################################################################################
 
 import random

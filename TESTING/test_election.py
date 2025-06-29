@@ -1,4 +1,8 @@
-# TESTING/test_election.py
+#github.com/yinkajets  ##myociormvbahproject-Summer2025
+
+###########################
+### TESTING election.py ###
+###########################
 
 from election import Election
 from config import t, n

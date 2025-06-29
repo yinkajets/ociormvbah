@@ -27,4 +27,3 @@ class DRh:
         Verifies that the provided value yj is valid at index j.
         """
         return VectorCommitment.VcVerify(index, commitment, yj, proof)
-

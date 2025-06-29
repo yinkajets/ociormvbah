@@ -4,80 +4,129 @@
 ### node.py : the core class that execute the OciorMVBAh protocol ###
 #####################################################################
 
-from acid import VectorCommitment
+
+from acid import VcCom, VcOpen, VcVerify
 from drh import DRh
+from abba import ABBA
 from abbba import ABBBA
-from config import t, n
+from election import Election
+from config import n, t
 
 class Node:
-    def __init__(self, node_id, input_value, round_number):
-        self.node_id = node_id
-        self.input_value = input_value
-        self.round = round_number
+    def __init__(self, ID):
+        self.ID = ID
+        self.input_vector = []
+        self.round = 0
         self.commitment = None
-        self.openings = {}
-        self.abbba = ABBBA(node_id, round_number)
-        self.vector_commitment = None
-        self.drh = None
+        self.other_commitments = {}
+        self.received_verified_values = {}
+        self.election = None
+        self.abba_instances = {}     # round -> ABBA instance
+        self.abbba_instances = {}    # round -> ABBBA instance
+        self.election_instances = {} # round -> Election instance
 
-    def vc_commit(self):
+    def set_input_vector(self, vector):
         """
-        Perform vector commitment over the value.
-        In this simple case, we assume the value is a vector of strings.
+        Sets the node's input vector.
         """
-        self.vector_commitment = VectorCommitment(self.input_value)
-        self.commitment = self.vector_commitment.VcCom()
+        self.input_vector = vector
+        self.drh = DRh(vector)
+
+    def commit_vector(self):
+        """
+        Commits to the vector using vector commitment (Merkle root).
+        """
+        if not self.input_vector:
+            raise ValueError("Input vector is empty or not set.")
+        self.commitment = VcCom(self.input_vector)
         return self.commitment
 
-    def vc_open(self, index):
+    def receive_commitment(self, from_id, commitment):
         """
-        Provide proof for the value at a specific index.
+        Receive and store commitment from another node.
         """
-        return self.vector_commitment.VcOpen(index)
+        self.other_commitments[from_id] = commitment
 
-    def vc_verify(self, index, value, proof, root):
+    def retrieve_value(self, index):
         """
-        Verify a committed value with proof.
+        Retrieve a value and proof at index using DRh.
         """
-        return VectorCommitment.VcVerify(index, root, value, proof)
+        drh = DRh(self.input_vector)
+        return drh.retrieve(index)
 
-    def run_abbba(self, peer_inputs):
+    def verify_value(self, index, value, proof, commitment):
         """
-        Run ABBBA consensus with inputs received from peers.
+        Verifies retrieved value against commitment.
         """
-        for peer_id, val in peer_inputs.items():
-            self.abbba.receive_input(peer_id, val)
-        decided_value = self.abbba.run()
-        return decided_value
+        return DRh.verify(index, value, proof, commitment)
 
-    def drh_retrieve(self, index):
+    def run_abba(self, r, values):
         """
-        Initialize DRh and retrieve value + proof.
+        Run ABBA instance for round r.
         """
-        self.drh = DRh(self.input_value)
-        return self.drh.retrieve(index)
+        if r not in self.abba_instances:
+            self.abba_instances[r] = ABBA(self.ID, r)
+        abba = self.abba_instances[r]
+        for sender_id in range(len(values)):
+            abba.receive_input(sender_id, values[sender_id])
+        if abba.is_ready():
+            return abba.run()
+        return None
 
-    def simulate_protocol(self, peer_inputs):
+    def abba_output(self):
         """
-        Full end-to-end simulation of one OciorMVBAh round at this node.
+        Return the output of the ABBA protocol if available.
         """
-        print(f"\n--- Node {self.node_id} ---")
-        print(f"Step 1: Vector Commitment for {self.input_value}")
-        root = self.vc_commit()
-        print(f"Commitment (Merkle root): {root}")
+        # We assume only one round is used for now (e.g., round 0)
+        if 0 in self.abba_instances:
+            return self.abba_instances[0].output
+        return None
 
-        print(f"Step 2: Run ABBBA with peer inputs")
-        decision = self.run_abbba(peer_inputs)
-        print(f"ABBBA decided on value: {decision}")
 
-        print(f"Step 3: Open DRh at index {decision}")
-        value, proof = self.drh_retrieve(decision)
-        print(f"Retrieved value: {value}")
-        print(f"Proof: {proof}")
 
-        print(f"Step 4: Verify the proof")
-        is_valid = self.vc_verify(decision, value, proof, root)
-        print(f"Is proof valid? {is_valid}")
+    def run_abbba(self, r, values):
+        """
+        Run ABBBA instance for round r.
+        """
+        if r not in self.abbba_instances:
+            self.abbba_instances[r] = ABBBA(self.ID, r)
+        abbba = self.abbba_instances[r]
+        for sender_id in range(len(values)):
+            abbba.receive_input(sender_id, values[sender_id])
+        if abbba.is_ready():
+            return abbba.run()
+        return None
 
-        return is_valid, value
+    def abbba_output(self, r=0):
+        """
+        Get the ABBBA output for round r.
+        """
+        if r in self.abbba_instances:
+            return self.abbba_instances[r].output_value
+        return None
+
+
+    def elect_committee(self, r, seeds):
+        """
+        Receive seeds and initialize election.
+        """
+        self.election = Election(self.ID, r)
+        for sender_id, seed in seeds.items():
+            self.election.receive_input(sender_id, seed)
+
+    def compute_election(self):
+        """
+        Compute election index.
+        """
+        if self.election is None:
+            raise Exception("Election instance not initialized.")
+        return self.election.compute_election()
+
+    def receive_retrieved_value(self, from_id, value, proof, commitment, index):
+        """
+        Receive and verify retrieved value from another node.
+        """
+        valid = self.drh.verify(index, value, proof, commitment)
+        if valid:
+           self.received_verified_values[from_id] = value
 

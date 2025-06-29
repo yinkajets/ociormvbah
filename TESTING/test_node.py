@@ -4,7 +4,6 @@
 ### test node.py ###
 ####################
 
-
 from node import Node
 from config import n
 
@@ -64,4 +63,3 @@ def simulate_ocior_mvbah():
 
 if __name__ == "__main__":
     simulate_ocior_mvbah()
-

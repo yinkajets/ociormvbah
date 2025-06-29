@@ -1,4 +1,7 @@
-# acid.py
+#############################################################
+### acid.py : vector commitment using Merkle tree (ACIDh) ###
+#############################################################
+
 from utils.merkle import MerkleTree
 
 class VectorCommitment:

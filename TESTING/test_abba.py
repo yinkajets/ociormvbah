@@ -4,9 +4,10 @@
 ### test abba.py ###
 ####################
 
-import random
 import sys
-sys.path.append("..")
+import os
+import random
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from abba import ABBA
 from config import n, t
